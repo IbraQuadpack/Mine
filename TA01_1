@@ -1,0 +1,131 @@
+
+IF "FirstScan" THEN
+    #estat := 0;
+    #suma := FALSE;
+    #maquina := 0;
+    #PECES_1 := #peces;
+    #M0 := 0;
+    #M1 := 0;
+    #M2 := 0;
+    #M3 := 0;
+    #M4 := 0;
+    #M5 := 0;
+END_IF;
+
+IF #M0 THEN
+    #M2 := 0;
+END_IF;
+
+
+IF #M3 THEN
+    #M0 := 0;
+END_IF;
+
+
+IF #M1 THEN
+    #M0 := 0;
+    #peces_suma := 0;
+END_IF;
+
+IF #M2 THEN
+    #M1 := 0;
+END_IF;
+
+IF #M3 THEN
+    #M2 := 0;
+END_IF;
+
+IF #M4 THEN
+    #M3 := 0;
+END_IF;
+
+
+
+
+                        
+                        
+
+
+
+                    // ACCIONS
+                    
+IF #bp THEN
+    IF #estat = 0 THEN
+        #M0 := 1;
+    END_IF;
+END_IF;
+                    
+                    
+                    
+IF #M0 THEN
+    IF #bp THEN
+        #estat := 1;
+        #maq_on := TRUE;  //flag UP timer 3
+        #inici_contador := TRUE;       //flag UP timer 2
+        #bp := 0;
+    ELSE
+        #inici_contador := FALSE;
+        //flag DOWN timer 2
+        #M1 := 1;
+        #peces_suma := 1;
+        #maq_on := FALSE;   //flag DOWN timer 3
+    END_IF;
+END_IF;
+    
+
+IF #M1 THEN
+    IF #bp THEN
+        #suma := TRUE;
+        #bp := 0;
+    ELSE
+        #suma := FALSE;
+    END_IF;
+    IF NOT(#contador_on) THEN
+        #M2 := 1;
+        #maquina := #maquina + (#peces - #valor_anterior) + #contador;
+        #PECES_1 := #maquina;
+        
+    END_IF;
+END_IF;
+
+"IEC_Counter_SUMA_DB_1".CTU(CU := #suma,R:= #peces_suma,
+                            PV := 50,
+                            CV => #contador);
+
+
+IF #M2 THEN
+    #valor_anterior := #peces;
+    IF #bp THEN
+        #M0 := 1;
+        #M1 := 0;
+    END_IF;
+    IF NOT (#mort) THEN
+        #estat := 0;
+        #M1 := 0;
+        #M2 := 0;
+    END_IF;
+END_IF;
+
+//TIMERS   ++  CONTADOR
+
+"IEC_Timer_Espera_DB_1".TOF(IN := #maq_on,
+                            PT := T#40S,
+                            Q => #mort,
+                            ET => #wait_3);
+
+"IEC_Timer_filtre_DB".TON(IN := "Polsador",
+                          PT := T#500MS,
+                          Q => #bp,
+                          ET => #wait_1);
+
+"IEC_Timer_Retard_DB".TOF(IN := #inici_contador,
+                          PT := T#10S,
+                          Q => #contador_on,
+                          ET => #wait_2
+);
+
+"IEC_Counter_0_DB".CTU(CU := #contador_on,
+                       PV := 65000,
+                       CV => #peces);
+
+
