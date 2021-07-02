@@ -1,0 +1,106 @@
+
+
+"IEC_Timer_S_DB".TON(IN := "S1",
+                     PT := T#500MS,
+                     Q => #estat_s,
+                     ET => #wait_1);
+
+
+
+"IEC_Timer_P_DB".TOF(IN := "P1",
+                     PT := T#500MS,
+                     Q => #estat_p,
+                     ET => #wait_2);
+
+
+                //BLOC ESTATS
+
+
+IF #M0 THEN
+    #M3 := 0;
+END_IF;
+
+IF #M1 THEN
+    #M0 := 0;
+    #M2 := 0;
+    #M3 := 0;
+END_IF;
+
+IF #M2 THEN
+    #M1 := 0;
+END_IF;
+
+IF #M3 THEN
+    #M2 := 0;
+END_IF;
+
+
+
+
+                //BLOC ESTATS
+                
+                
+                
+IF #bp_inici THEN
+    #estat_maquina := 1;
+    #M0 := 1;
+    #bp_inici := 0;
+    #peces_llista := 0;
+    #M1 := 0;
+    #M2:= 0;
+    #M3 := 0;
+    #reset := 1;
+    
+ELSE
+    #reset := 0;
+END_IF;
+
+#estat_pp := NOT (#estat_p);
+
+IF #M0 THEN
+    IF #estat_maquina = 1 AND #estat_p THEN
+        #M1 := 1;
+    END_IF;
+END_IF;
+
+IF #M1 THEN
+    IF #estat_s THEN
+        #M2 := 1;
+        #bp_S := 1;
+    END_IF;
+    
+END_IF;
+
+"IEC_Counter_0_DB".CTU(CU := #bp_S,
+                       R := #reset,
+                       PV := 100,
+                       Q => #suma,
+                       CV => #peces_llista);
+
+IF #M2 THEN
+    IF #bp_S THEN
+        //#peces_llisto := #peces_llisto + 1;
+        #M1 := 1;
+        #bp_S := 0;
+    END_IF;
+    
+END_IF;
+
+
+
+
+IF #M3 THEN
+    IF #bp_P THEN // Statement section IF
+        #reset := 1;
+        #bp_P := 0;
+        #peca := #peca + #peces_llista - 2;
+    ELSE
+        #reset := 0;
+        #M0 := 0;
+    END_IF;
+
+END_IF;
+
+      
+
+
