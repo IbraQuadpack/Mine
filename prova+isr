@@ -1,0 +1,21 @@
+import mraa
+import os
+import sys
+import time
+import struct
+
+def function(gpio):
+    print("Polsat")
+
+polsador = mraa.Gpio(4)
+polsador.dir(mraa.DIR_IN)
+polsador.isr(mraa.EDGE_RISING,function,polsador)
+
+
+
+
+while True :
+    time.sleep(0.3)
+
+
+
