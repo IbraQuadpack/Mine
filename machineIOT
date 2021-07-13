@@ -1,0 +1,333 @@
+import snap7.client as c
+from random import randint
+import os
+import mraa
+try:
+    import usb.core
+    import usb.util
+    import sys
+    import time
+    import struct
+    import json
+except:
+    print('Error import USB')
+""" 
+    Mòdul Python creat per les comunicacions amb les màquines de TWP 
+    utilitzant els dispositius IOT2040
+    Classes: Comunication, USB(Comunication), Modbus (Comunication), S7 (Comunication) ,UART (Comunication)
+    SF: UinDuint
+    Python3
+    Autor: Roger Colomer 
+    Data de creació : 07/04/2020
+    Modicifacio : 15/4/2020
+"""
+# dicc = {'pIn' : [0,0],'pOut' : [0,0],'state' : [0,0],'a0' : [0,0],'a1' : [0,0],'a2' : [0,0]}
+# print(dicc[list_pins[0][0]])
+
+def UintDuint(c0, c1):
+    s0 = hex(c0)[2:len(hex(c0))]  # concatenem els dos parells de bytes en 4 bytes junts per fer una DUINT
+    s1 = hex(c1)[2:len(hex(c1))]
+    # omplim les string amb 0's peque es puguin concatenar (4 valors hex cada una )
+    # quan es concatenin tindran 8 valors hex que són 32 bits
+    while len(s0) < 4:
+        s0 = '0' + s0
+    while len(s1) < 4:
+        s1 = '0' + s1
+    t = (s1 + s0)
+    return int(t, 16)
+
+
+class Comunication:
+    def __init__(self, v):  # ordre variables, longitud lectura
+        self.variables = v
+        self.len0 = self.get_len()
+
+        self.data = []
+        self.dataA = []
+        self.dataB = 'b'
+
+    def get_len(self):
+        l = 0
+        for v in self.variables:
+            if v[2] == 1:
+                l += v[1]
+        return l
+
+    def makeArray(self):
+        pos = 0
+        self.dataA = []
+        for var in self.variables:
+            if var[2] == 1:  # ha destar plena
+                if var[1] == 1:  # 2 bytes
+                    self.dataA.append(self.data[pos])
+                    pos += 1
+                elif var[1] == 2:  # 4 bytes
+                    self.dataA.append(UintDuint(self.data[pos], self.data[pos + 1]))
+                    pos += 2
+                else:
+                    print('el valor no és ni 1 ni 2')
+            elif var[2] == 0:
+                if var[1] == 1:  # 2 bytes
+                    self.dataA.append(0)
+                elif var[1] == 2:  # 4 bytes
+                    self.dataA.append(0)
+                else:
+                    print('el valor no és ni 1 ni 2')
+
+    def makeBytes(self):
+        self.dataB = b''
+        pos = 0
+        for var in self.variables:
+            if var[1] == 1:  # 2 bytes
+                self.dataB += (self.dataA[pos]).to_bytes(2, byteorder='big')
+            elif var[1] == 2:  # 4 bytes
+                self.dataB += (self.dataA[pos]).to_bytes(4, byteorder='big')
+            else:
+                print('el valor no és ni 1 ni 2')
+            pos += 1
+
+    def makeBytesOrder(self, nOrder):
+        '''
+        Funcion para ordenar las variables para mesbook (entrada estado variables
+        :param nOrder:
+        :return:
+        '''
+        self.dataB = b''
+        pos = 0
+        for no in nOrder:
+            for v in self.variables:
+                if no == v[0]:
+                    if v[1] == 1:
+                        self.dataB += (self.dataA[pos]).to_bytes(2, byteorder='big')
+                    elif v[1] == 2:
+                        self.dataB += (self.dataA[pos]).to_bytes(4, byteorder='big')
+            pos += 1
+
+    def get_A(self):
+        return self.dataA
+
+    def get_B(self):
+        return self.dataB
+
+    def upgradeA(self,ar):
+        self.dataA = ar
+
+    def __str__(self):
+        return str(self.data) + '\n' + str(self.dataA) + '\n' + str(self.dataB)
+
+
+
+            #LECTURA JSON
+
+file = open("/home/root/config.json")
+dicc_json = json.load(file)
+file.close()
+
+            #CONFIGURACIÓ JSON
+
+flanc = {'rising' : mraa.EDGE_RISING,'falling' : mraa.EDGE_FALLING,'both' : mraa.EDGE_BOTH}
+DI10 = {'di0' : 4,'di1' : 5,'di2' : 6,'di3' : 7,'di4' : 8,'di5' : 9,'di6' : 10,'di7' : 11,'di8' : 12,'di9' : 13,'di10' : 14,}
+DI5 = {'di0' : 12,'di1' : 11,'di2' : 10,'di3' : 9,'di4' : 4,}
+conf_targ = None
+dicc_conf = {'pIn': [0, 0], 'pOut': [0, 0], 'state': [0, 0], 'a0': [0, 0], 'a1': [0, 0], 'a2': [0, 0], 'a3': [0, 0], 'a4': [0, 0], 'a5': [0, 0], 'a6': [0, 0], 'a7': [0, 0]}
+#p_pin=0;fl_pin=0;p_pout=0;fl_pout=0;p_state=0;fl_state=0;p_a0=0;fl_a0=0;p_a1=0;fl_a1=0;p_a2=0;fl_a2=0;p_a3=0;fl_a3=0;p_a4=0;fl_a4=0;p_a5=0;fl_a5=0;p_a6=0;fl_a6=0;p_a7=0;fl_a7=0;
+
+        #PROCESSAMENT JSON
+
+if dicc_json['targeta'] == 'DI10' :
+    conf_targ = DI10
+else :
+    conf_targ = DI5
+
+
+for value in (dicc_json['variables']) :
+    dicc_conf[value[0]] = [conf_targ[value[1]],flanc[value[2]]]
+
+'''
+for pin in list_pins :
+    if 'pIn' in pin :
+        p_pin = conf_targ[pin[1]]
+        fl_pin = flanc[pin[2]]
+    if 'pOut' in pin :
+        p_pout = conf_targ[pin[1]]
+        fl_pout = flanc[pin[2]]
+    if 'state' in pin :
+        p_state = conf_targ[pin[1]]
+        fl_state = flanc[pin[2]]
+    if 'a0' in pin :
+        p_a0 = conf_targ[pin[1]]
+        fl_a0 = flanc[pin[2]]
+    if 'a1' in pin :
+        p_a1 = conf_targ[pin[1]]
+        fl_a1 = flanc[pin[2]]
+    if 'a2' in pin :
+        p_a2 = conf_targ[pin[1]]
+        fl_a2 = flanc[pin[2]]
+    if 'a3' in pin :
+        p_a3 = conf_targ[pin[1]]
+        fl_a3 = flanc[pin[2]]
+    if 'a4' in pin :
+        p_a4 = conf_targ[pin[1]]
+        fl_a4 = flanc[pin[2]]
+    if 'a5' in pin :
+        p_a5 = conf_targ[pin[1]]
+        fl_a5 = flanc[pin[2]]
+    if 'a6' in pin :
+        p_a6 = conf_targ[pin[1]]
+        fl_a6 = flanc[pin[2]]
+    if 'a7' in pin :
+        p_a7 = conf_targ[pin[1]]
+        fl_a7 = flanc[pin[2]]
+'''
+
+
+def F_pin(a):
+    di10.pIn += 1
+    print('suma peça_in')
+
+def F_pout(a):
+    di10.pOut +=1
+    print('suma peca-out')
+
+def F_state(a):
+    estat = D_state.read()
+    if estat :
+        di10.state = 1
+    else :
+        di10.state = 0
+    print('state_scan')
+
+def F_a0(a):
+    estat = D_a0.read()
+    if estat:
+        di10.a0 = 1
+    else:
+        di10.a0 = 0
+    print('state_a0')
+
+def F_a1(a):
+    estat = D_a1.read()
+    if estat:
+        di10.a1 = 1
+    else:
+        di10.a1 = 0
+    print('state_a1')
+
+def F_a2(a):
+    estat = D_a2.read()
+    if estat:
+        di10.a2 = 1
+    else:
+        di10.a2 = 0
+    print('state_a2')
+def F_a3(a):
+    estat = D_a3.read()
+    if estat:
+        di10.a3 = 1
+    else:
+        di10.a3 = 0
+    print('state_a3')
+def F_a4(a):
+    estat = D_a4.read()
+    if estat:
+        di10.a4 = 1
+    else:
+        di10.a4 = 0
+    print('state_a4')
+def F_a5(a):
+    estat = D_a5.read()
+    if estat:
+        di10.a5 = 1
+    else:
+        di10.a5 = 0
+    print('state_a5')
+def F_a6(a):
+    estat = D_a6.read()
+    if estat:
+        di10.a6 = 1
+    else:
+        di10.a6 = 0
+    print('state_a6')
+def F_a7(a):
+    estat = D_a7.read()
+    if estat:
+        di10.a7 = 1
+    else:
+        di10.a7 = 0
+    print('state_a7')
+
+
+D_pin = mraa.Gpio(dicc_conf['pIn'][0])
+D_pin.dir(mraa.DIR_IN)
+D_pin.isr(dicc_conf['pIn'][1], F_pin, D_pin)
+
+D_pout = mraa.Gpio(dicc_conf['pOut'][0])
+D_pout.dir(mraa.DIR_IN)
+D_pout.isr(dicc_conf['pOut'][1], F_pout, D_pout)
+
+D_state = mraa.Gpio(dicc_conf['state'][0])
+D_state.dir(mraa.DIR_IN)
+D_state.isr(dicc_conf['state'][1], F_state, D_state)
+
+D_a0 = mraa.Gpio(dicc_conf['a0'][0])
+D_a0.dir(mraa.DIR_IN)
+D_a0.isr(dicc_conf['a0'][1], F_a0, D_a0)
+
+D_a1 = mraa.Gpio(dicc_conf['a1'][0])
+D_a1.dir(mraa.DIR_IN)
+D_a1.isr(dicc_conf['a1'][1], F_a1, D_a1)
+
+D_a2 = mraa.Gpio(dicc_conf['a2'][0])
+D_a2.dir(mraa.DIR_IN)
+D_a2.isr(dicc_conf['a2'][1], F_a2, D_a2)
+
+D_a3 = mraa.Gpio(dicc_conf['a3'][0])
+D_a3.dir(mraa.DIR_IN)
+D_a3.isr(dicc_conf['a3'][1], F_a3, D_a3)
+
+D_a4 = mraa.Gpio(dicc_conf['a4'][0])
+D_a4.dir(mraa.DIR_IN)
+D_a4.isr(dicc_conf['a4'][1], F_a4, D_a4)
+
+D_a5 = mraa.Gpio(dicc_conf['a5'][0])
+D_a5.dir(mraa.DIR_IN)
+D_a5.isr(dicc_conf['a5'][1], F_a5, D_a5)
+
+D_a6 = mraa.Gpio(dicc_conf['a6'][0])
+D_a6.dir(mraa.DIR_IN)
+D_a6.isr(dicc_conf['a6'][1], F_a6, D_a6)
+
+D_a7 = mraa.Gpio(dicc_conf['a7'][0])
+D_a7.dir(mraa.DIR_IN)
+D_a7.isr(dicc_conf['a7'][1],F_a7, D_a7)
+
+
+#Classe Di10
+
+class DI10():
+
+    pIn = 0; pOut = 0; state = 0
+    a0 = 0; a1 = 0; a2 = 0
+    a3 = 0; a4 = 0; a5 = 0
+    a6 = 0; a7 = 0
+
+    def __init__(self):
+        self.dataA = []
+        self.file = open("/home/root/config.json")
+        self.dicConfig = json.load(self.file)
+        self.file.close()
+
+    def readData(self):
+        self.dataA = [self.piezasProcessadas, self.piezasProcessadas, self.estadoLinea]
+        return True
+
+    def resetData(self):
+        self.piezasProcessadas = 0
+
+#Creació de l'objecte di10
+di10 = DI10()
+
+
+
+while True :
+    pass
