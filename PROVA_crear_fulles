@@ -1,0 +1,27 @@
+import openpyxl
+
+
+
+wb = openpyxl.Workbook()
+count = 0
+name = str(count) + ' - Dades '
+ws = wb.create_sheet('hola',index=0)
+
+for k in range (0,2) :
+    if count == 0 :
+        for i in range (0,50) :
+            ws.cell(1, i + 1, i+4)
+    else :
+        for i in range (0,30) :
+            ws.cell(1, i + 1, i+4)
+    wb.save(name + ".xlsx")
+    print(wb.sheetnames)
+    wb.remove(wb['hola'])
+    count += 1
+    name = str(count) + ' - Dades '
+    ws = wb.create_sheet('hola', index=0)
+    print(wb.sheetnames)
+
+
+
+wb.close()
