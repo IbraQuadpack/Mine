@@ -1,0 +1,72 @@
+import openpyxl
+import time
+
+wb = openpyxl.load_workbook("102021.xlsx",read_only=True)
+ws = wb.active
+
+anterior = '05/11/2021, 04:31:00'
+anterior_2 = '05/11/2021, 04:31:00'
+
+cc = []
+ultim = None
+#cc = ['05/31/2021, 23:59:56', '05/31/2021, 23:59:59']
+
+# for row in ws.iter_rows(min_row=ws.max_row-1, max_col=60, max_row=ws.max_row):
+#     for cell in row:
+#         if isinstance(cell.value,str) :
+#             if ',' in cell.value :
+#                 cc.append(cell.value)
+
+for row in ws.iter_rows(min_row=1, max_row=ws.max_row,min_col=42, max_col=42):
+    for cell in row :
+        if cell.value != None :
+            anterior = cell.value
+
+print(anterior)
+
+for row in ws.iter_rows(min_row=1, max_row=ws.max_row,min_col=1, max_col=1):
+    for cell in row:
+        if cell.value != None:
+            anterior_2 = cell.value
+
+print(anterior_2)
+
+
+
+
+def temps (dada) :
+    last_var = []
+    last_al = []
+    for a in dada :
+        k = a.split(',')
+        tempo = k[0].split('/')
+        hora = k[1].split(':')
+        for i in range (0,len(tempo)) :
+            tempo[i] = int(tempo[i])
+            hora[i] = int(hora[i])
+
+        if last_var == [] :
+            last_var.append(tempo)
+            last_var.append(hora)
+        else :
+            last_al.append(tempo)
+            last_al.append(hora)
+
+    return last_var,last_al
+
+
+# last_var,last_al = temps (cc)
+#
+# print(last_var)
+# print(last_al)
+
+# for row in ws.rows:
+#     for cell in row :
+#         #print('tipus de valor : ',type(cell.value),'  -   Valor : ',cell.value)
+#         #time.sleep(0.1)
+#         pass
+#         # if isinstance(cell.value,str) :
+#         #     if ',' in cell.value :
+#         #         print(cell.value)
+#
+# print(ws.max_row)
