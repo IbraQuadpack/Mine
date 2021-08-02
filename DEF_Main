@@ -1,0 +1,252 @@
+import os
+import openpyxl
+from datetime import datetime
+from openpyxl import Workbook
+from calendar import monthrange
+import random
+
+path_SQL = '/home/server/Informes-OTR/SQL'
+path_Excel = '/home/server/Informes-OTR/Excel'
+final_mes = None
+
+def carpeta (path) :
+    if 'Excel' in path :
+        type = 0
+    else :
+        type = 1
+    llista = list(os.listdir(path))
+    data = []
+    for k in llista :
+        a = k.split('.')
+        if type :
+            data.append(a[-2])
+        else :
+            data.append(int(a[-2]))
+            #data.append(int(a[-2][:-4]))
+    return data
+
+# 1. Buscar ultim excel
+
+dada = max(carpeta(path_Excel))
+if len(str(dada)) == 5 :
+    dada = '0'+str(dada)
+fitxer = '/home/server/Informes-OTR/Excel/'+str(dada)+'.xlsx'
+
+
+#2. Buscar ultima dada excel
+
+print('inicio2')
+wb = openpyxl.load_workbook(fitxer,read_only=True)
+ws = wb.active
+cc = []
+
+last_var = None
+
+for row in ws.iter_rows(min_row=1, max_row=ws.max_row,min_col=42, max_col=42):
+    for cell in row :
+        if cell.value != None :
+            last_var = cell.value
+
+last_al = None
+
+for row in ws.iter_rows(min_row=1, max_row=ws.max_row,min_col=1, max_col=1):
+    for cell in row:
+        if cell.value != None:
+            last_al = cell.value
+
+last_var = '06/09/2021, 00:59:49';last_al = '06/09/2021, 00:59:49';
+
+print('Fin2')
+
+# 3. Concatenar ultima dada amb els sql.
+
+def temps (dada) :
+    last_var = []
+    last_al = []
+    for a in dada :
+        k = a.split(',')
+        tempo = k[0].split('/')
+        hora = k[1].split(':')
+        # for i in range (0,len(tempo)) :
+        #     tempo[i] = int(tempo[i])
+        #     hora[i] = int(hora[i])
+        if last_var == [] :
+            last_var.append(tempo)
+            last_var.append(hora)
+        else :
+            last_al.append(tempo)
+            last_al.append(hora)
+
+    return last_var,last_al
+
+last_var = '06/09/2021, 00:59:49';last_al = '06/09/2021, 00:59:49'
+last_var,last_al = temps([last_var,last_al])
+print(ultima,last_var)
+
+if int(last_var[0][1]) == 31 :
+    final_mes = 1
+
+SQL = carpeta(path_SQL)
+SQL_int = []
+for d in range (0,len(SQL)) :
+    SQL_int.append(int(SQL[d]))
+
+ultima_captura_var = last_var[0][2][2:]+last_var[0][0]+last_var[0][1]
+ultima_captura_al = last_al[0][2][2:]+last_al[0][0]+last_al[0][1]
+print(ultima_captura_var)
+
+if ultima_captura_var in SQL :
+    SQL_int.sort()
+    index = SQL.index(ultima_captura_var)
+    dada = str(SQL[index+1])
+    print('Correcte')
+    fitxer = '/home/server/Informes-OTR/SQL/backup_OTR.db.'+dada+'.sql'
+else :
+    print('Error lectura')
+
+
+#4. Accedim al SQL.
+
+print()
+
+with open(fitxer, 'r') as myfile:
+    data = myfile.read()
+
+str_al1 = """INSERT INTO `alarmes` VALUES """
+str_al2 = """/*!40000 ALTER TABLE `alarmes` ENABLE KEYS"""
+
+str_var1 = """INSERT INTO `data` VALUES """
+str_var2 = """/*!40000 ALTER TABLE `data` ENABLE KEYS"""
+
+name = ['timestamp', 'Feedback_V101', 'Pot_cremador', 'Feedback_V002', 'TE101', 'TE105', 'TE107', 'TE108', 'TE111','TE112',
+   'TE113','PT102','PT103','PT104','PT109','Estat_OTR','V101','V102','V001','V011','V012','V013','V021','V022','V023',
+   'V031','V032','V033','V401','V402','V403','V404','V405','V406','V407','V408','Estat_linies','Estat_filtres','lm',
+   'PC_103_104','PC_102_109','timestamp','ATipo1','ATipo2','ATipo3','ATipo4','ATipo5','ATipo6','ATipo7',
+        'ATipo8','ATipo9','ATipo10','ATipo11','ATipo12']
+
+table_al = data[data.find(str_al1) + len(str_al1) + 1:data.find(str_al2) - 2]
+table_var = data[data.find(str_var1) + len(str_var1) + 1:data.find(str_var2) - 2]
+
+def extract (str1,str2,table,bit) :
+    listData = []
+    while table.find(str1) != -1:
+        table = table[table.find(str1)+len(str1)+1:-1]
+        window = table[0:table.find(str1)]
+        caca = window.split("),(")
+        for c in caca:
+            ar = []
+            a = c.split(',')
+            if bit :
+                a = a[:14]
+            else :
+                a = a[:44]
+            #print(a[0][1:-1])
+            try :
+                ar.append(datetime.strptime(a[0][1:-1],"%Y-%m-%d %H:%M:%S"))
+            except :
+                pass
+            for i in range(1,len(a)-1):
+                if a[i] != 'NULL':
+                    try :
+                        ar.append(float(a[i]))
+                    except :
+                        ar.append(a[i])
+            listData.append(ar)
+    list = []
+    mes = []
+    anterior = listData[0][0].month
+    for i in range (len(listData)):
+        #print(i[0].day,i[0].month)
+        if listData[i][0].month != anterior or (i == len(listData)-1) :
+            # print('dia', i[0].day, 'mes', i[0].month)
+            print('CANVI MES!!!!')
+            #print(listData[i][0].month)
+            #print('anterior : ', anterior)
+            list.append(mes)
+            mes = []
+        else :
+            mes.append(listData[i])
+        anterior = listData[i][0].month
+    #('len list',len(list))
+    return list
+def excel (lista,j,fila) :
+    for instant in range (0,len(lista)) :
+        for val in range(len(lista[instant])):
+            if val == 0 :
+                ws.cell(fila, 1+j, lista[instant][0].strftime("%m/%d/%Y, %H:%M:%S"))
+            else :
+                ws.cell(fila, val+1+j, lista[instant][val])
+        fila+=1
+    print(str(lista[len(lista)-1][0].month))
+    print(str(lista[len(lista)-1][0].year))
+
+listData_al = extract (str_al1,str_al2,table_al,True)
+listData_var = extract(str_var1,str_var2,table_var,False)
+
+
+#5. Escribim al Excel
+ #Utilitzarem la ultima dada per saber si obrir un nou fitxer o buscar un excel per omplir.
+
+if final_mes :
+    #Executar el extracció_2
+    for k in listData_var :
+        for m in k :
+            if m[0].day == 1 :
+                # es crea un nou document i es comença a esciure.
+                pass
+else :
+    #Buscar el fitxer excel, obrir i començar a modificar.
+    for i in listData_var:
+        for k in i:
+            if k[0].month == 1:
+                pass
+
+# for i in listData_var :
+#     for k in i :
+#         if final_mes and (k[0].month == 1) :
+#             nova_fitxa = 1
+#             break
+#         if k[0].month ==
+
+
+
+
+if nova_fitxa :
+    for k in range(len(listData_var)):
+        excel(listData_var[k], 0, 2)
+        excel(listData_al[k], 41, 2)
+        if listData_var[k][-1][0].month >= 10:
+            nom = str(listData_var[k][-1][0].month) + str(listData_var[k][-1][0].year) + ".xlsx"
+        else:
+            nom = '0' + str(listData_var[k][-1][0].month) + str(listData_var[k][-1][0].year) + ".xlsx"
+        wb.save(nom)
+        wb.remove(wb['dades'])
+        ws = wb.create_sheet('dades', index=0)
+
+
+
+
+
+
+
+
+
+
+fila = 2
+j=0                         #Variable control de les columnes
+wb = Workbook()
+
+                #NOVA FULLA
+
+# ws = wb.create_sheet('dades',index=0)
+# for i in range(len(name)):
+#     ws.cell(1, i+1, name[i])
+
+# for i in range (len(listData_var)) :
+#     for k in listData_var[i] :
+#         print(k[0].month)
+
+
+
+last_var = '06/09/2021, 00:59:49';last_al = '06/09/2021, 00:59:49'
+
