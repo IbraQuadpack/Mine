@@ -1,0 +1,152 @@
+from datetime import datetime
+from openpyxl import Workbook
+from calendar import monthrange
+
+with open("/home/server/Informes-OTR/backup_OTR.db.210607.sql", 'r') as myfile:
+    data = myfile.read()
+
+str_al1 = """INSERT INTO `alarmes` VALUES """
+str_al2 = """/*!40000 ALTER TABLE `data` ENABLE KEYS"""
+
+str_var1 = """INSERT INTO `data` VALUES """
+str_var2 = """/*!40000 ALTER TABLE `value` ENABLE KEYS"""
+
+
+# name_al = ['timestamp','ATipo1','ATipo2','ATipo3','ATipo4','ATipo5','ATipo6','ATipo7',
+#         'ATipo8','ATipo9','ATipo10','ATipo11','ATipo12']
+#
+# name_var = ['timestamp', 'Feedback_V101', 'Pot_cremador', 'Feedback_V002', 'TE101', 'TE105', 'TE107', 'TE108', 'TE111','TE112',
+#    'TE113','PT102','PT103','PT104','PT109','Estat_OTR','V101','V102','V001','V011','V012','V013','V021','V022','V023',
+#    'V031','V032','V033','V401','V402','V403','V404','V405','V406','V407','V408','Estat_linies','Estat_filtres','lm',
+#    'PC_103_104','PC_102_109']
+
+name = ['timestamp', 'Feedback_V101', 'Pot_cremador', 'Feedback_V002', 'TE101', 'TE105', 'TE107', 'TE108', 'TE111','TE112',
+   'TE113','PT102','PT103','PT104','PT109','Estat_OTR','V101','V102','V001','V011','V012','V013','V021','V022','V023',
+   'V031','V032','V033','V401','V402','V403','V404','V405','V406','V407','V408','Estat_linies','Estat_filtres','lm',
+   'PC_103_104','PC_102_109','timestamp','ATipo1','ATipo2','ATipo3','ATipo4','ATipo5','ATipo6','ATipo7',
+        'ATipo8','ATipo9','ATipo10','ATipo11','ATipo12']
+
+def sheet(list):
+    y = list[0].year - 2000
+    m = list[0].month
+    d = list[0].day
+
+    if m >= 10:
+        sheet = str(m) + str(y)
+    else:
+        sheet = '0' + str(m) + str(y)
+    return sheet, y, m, d
+
+table_al = data[data.find(str_al1) + len(str_al1) + 1:data.find(str_al2) - 2]
+table_var = data[data.find(str_var1) + len(str_var1) + 1:data.find(str_var2) - 2]
+
+
+def extract (str1,str2,table,bit) :
+    listData = []
+    while table.find(str1) != -1:
+        table = table[table.find(str1)+len(str1)+1:-1]
+        window = table[0:table.find(str1)]
+        caca = window.split("),(")
+        for c in caca:
+            ar = []
+            a = c.split(',')
+            if bit :
+                a = a[:14]
+            else :
+                a = a[:44]
+            ar.append(datetime.strptime(a[0][1:-1],"%Y-%m-%d %H:%M:%S"))
+            for i in range(1,len(a)-1):
+                if a[i] != 'NULL':
+                    try :
+                        ar.append(float(a[i]))
+                    except :
+                        ar.append(a[i])
+            listData.append(ar)
+    return listData
+
+listData_al = extract (str_al1,str_al2,table_al,True)
+listData_var = extract(str_var1,str_var2,table_var,False)
+
+print(len(listData_var))
+print(listData_var[0])
+print(len(listData_var[0]))
+print(len(listData_al))
+print(listData_al[0])
+print(len(listData_al[0]))
+
+nom = sheet(listData_var[0])
+back_month = listData_var[0][0].month
+
+fila = 2
+j=0                         #Variable control de les columnes
+wb = Workbook()
+ws = wb.active
+pos_al = 0
+suma=0
+
+alarma = None
+
+for i in range(len(name)):
+    ws.cell(1, i+1, name[i])
+
+
+
+for instant in range (0,len(listData_var)) :
+    vv,y,m,d = sheet(listData_var[instant])
+    if m != back_month :                          #wb.save(nom)   j = 43
+        print('canvi de mes variables')
+        fila = 2
+        j = 41                                      # Posició alarma desplaçada 41 posicions quant columnes
+        nom = sheet(listData_al[0])
+        back_month = listData_al[0][0].month
+        for k in range(0+suma, len(listData_al)):
+            pos_al+=1
+            vv, y, m, d = sheet(listData_al[k])
+            if m != back_month:
+                print('canvi de mes alarmes')
+                fila = 2
+                j = 0
+                wb.save(nom)
+                suma = pos_al                           #No podem cambiar el range mentre executa
+                break
+            for val in range(len(listData_al[k])):
+                if val == 0:
+                    ws.cell(fila, 1 + j, listData_al[k][0].strftime("%m/%d/%Y, %H:%M:%S"))
+                else:
+                    ws.cell(fila, val + 1 + j, listData_al[k][val])
+            fila += 1
+            back_month = m
+            nom = str(vv) + ".xlsx"
+    for val in range(len(listData_var[instant])):
+        if val == 0 :
+            ws.cell(fila, 1+j, listData_var[instant][0].strftime("%m/%d/%Y, %H:%M:%S"))
+        else :
+            ws.cell(fila, val+1+j, listData_var[instant][val])
+    fila+=1
+    back_month = m
+    nom = str(vv) + ".xlsx"
+
+
+nom = 'error' + ".xlsx"
+wb.save(nom)
+
+
+
+
+# tata =  [[datetime(2021, 5, 11, 3, 9, 51), 89.08, 0.0, 100.0, 18.12, 107.03, 812.74, 30.73, 61.66, 46.88, 56.95, -1.54, 285.66],
+#          [datetime(2021, 5, 11, 3, 9, 54), 89.07, 0.0, 100.0, 17.73, 107.15, 812.87, 30.57, 61.5, 46.81, 56.77, -1.5, 285.16],
+#          [datetime(2021, 5, 11, 3, 9, 57), 89.07, 0.0, 100.0, 17.71, 107.39, 812.92, 30.42, 60.91, 47.22, 56.42, -1.45, 285.02],
+#          [datetime(2021, 5, 11, 3, 10, 1), 89.08, 0.0, 100.0, 17.9, 107.69, 813.11, 30.3, 60.57, 46.67, 56.42, -1.41, 285.2],
+#          [datetime(2021, 5, 11, 3, 10, 4), 89.07, 0.0, 100.0, 17.72, 108.07, 813.21, 30.18, 60.11, 48.25, 56.16, -1.37, 285.77],
+#          [datetime(2021, 5, 11, 3, 10, 8), 89.08, 0.0, 100.0, 18.14, 108.5, 813.27, 30.09, 59.46, 47.6, 55.91, -1.29, 285.52],
+#          [datetime(2021, 5, 11, 3, 10, 11), 89.08, 0.0, 100.0, 18.3, 109.02, 813.33, 29.82, 58.89, 47.03, 57.74, -1.27, 285.15],
+#          [datetime(2021, 5, 11, 3, 10, 15), 89.07, 0.0, 100.0, 18.06, 109.58, 813.43, 30.08, 60.31, 46.93, 59.91, -1.23, 285.71],
+#          [datetime(2021, 5, 11, 3, 10, 18), 89.07, 0.0, 100.0, 17.6, 110.23, 813.54, 30.68, 59.94, 46.76, 60.41, -1.2, 285.71],
+#          [datetime(2021, 5, 11, 3, 10, 22), 89.07, 0.0, 100.0, 17.86, 110.91, 813.6, 30.55, 59.48, 46.52, 62.09, -1.16, 285.6],
+#          [datetime(2021, 5, 11, 3, 10, 25), 89.08, 0.0, 100.0, 18.16, 111.63, 813.78, 30.41, 59.2, 46.03, 63.32, -1.14, 285.93],
+#          [datetime(2021, 5, 11, 3, 10, 29), 89.08, 0.0, 100.0, 17.84, 112.41, 813.93, 30.26, 60.48, 45.91, 62.61, -1.12, 285.98],
+#          [datetime(2021, 5, 11, 3, 10, 32), 89.07, 0.0, 100.0, 18.13, 113.21, 814.12, 32.36, 60.08, 45.39, 61.76, -1.09, 285.88]]
+
+
+
+
